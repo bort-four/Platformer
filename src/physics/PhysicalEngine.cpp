@@ -36,23 +36,38 @@ struct ObjectMetadata
 };
 
 
+struct CollisionInfo
+{
+    size_t _lessObjectNum, _largerObectNum;
+    double _time;
+    bool _hasCollision;
+    Direction _direction;
+};
+
+
 
 struct PhysicalEngine::Impl
 {
     using ObjectIteratorPtr = Pointer<Iterator<SimplePhysicalObjectPointer>>;
 
-//    double getCollisionTime(const Rectangle rect1, const Rectangle rect2);
+    // processing steps
+    void updateObjectMetadata(ObjectMetadata *metadataPtr);
+    void applyPhisicalRules(SimplePhysicalObjectPointer objPtr);
+    void performPostProcess();
 
-    std::pair<double, Direction> getCollisionTime(size_t objNum1, size_t objNum2, double frameTime);
     void processCollision(size_t objNum1, size_t objNum2,
                           double frameTime, double collisionTimeFactor, Direction direction);
-    Point getRotatedVector(const Point &point, double angle);
+
+    // important functions
+    std::pair<double, Direction> getCollisionTime(size_t objNum1, size_t objNum2, double frameTime);
+
     std::pair<double, double> solveCentralHit(double speed1, double mass1, double speed2, double mass2);
+
     void applyFrictionBetween(SimplePhysicalObjectPointer obj1Ptr,
                               SimplePhysicalObjectPointer obj2Ptr,
                               bool isHorizontal, double frameTime);
-//    void activate(SimplePhysicalObjectPointer objPtr,
-//                  SimplePhysicalObjectPointer parentPtr);
+
+
     void activate(ObjectMetadata *metadataPtr,
                   ObjectMetadata *parentMetadataPtr);
     void processStand(ObjectMetadata *metadataPtr);
@@ -60,8 +75,6 @@ struct PhysicalEngine::Impl
 
     PhysicalWorldPointer _worldPtr;
     std::vector<ObjectMetadata> _objectVect;
-//    std::vector<size_t> _staticFrameCountVect;
-//    std::vector<Point> _lastPositionVect;
     SimpleHierarchicalVisitorPointer<PhysicalObject> _objectCollectorPtr;
 
     double _g = 2000.0;
@@ -73,6 +86,9 @@ struct PhysicalEngine::Impl
 };
 
 
+//#define DEBUG_OUTPUT
+
+// constructors, destructor and so on
 
 PhysicalEngine::PhysicalEngine()
     : _pimpl(new Impl())
@@ -90,28 +106,7 @@ PhysicalEngine& PhysicalEngine::operator=(PhysicalEngine&& /*other*/) = default;
 PhysicalEngine::~PhysicalEngine() = default;
 
 
-PhysicalWorldPointer PhysicalEngine::getWorldPtr() const
-{
-    return _pimpl->_worldPtr;
-}
-
-void PhysicalEngine::setWorldPtr(PhysicalWorldPointer worldPtr)
-{
-    _pimpl->_worldPtr = worldPtr;
-    updateMetadata();
-}
-
-void PhysicalEngine::updateMetadata()
-{
-    if (getWorldPtr() == nullptr)
-        throw std::logic_error("PhysicalEngine::updateObjectCache: world is not set");
-
-    _pimpl->_objectVect.clear();
-    _pimpl->_objectCollectorPtr->visit(getWorldPtr()->getSubObjects());
-}
-
-
-//#define DEBUG_OUTPUT
+// main method
 
 void PhysicalEngine::processWorld()
 {
@@ -127,15 +122,25 @@ void PhysicalEngine::processWorld()
 
         if (d.getLength() < getMinDistance() && objPtr->getSpeed().getLength() * frameTime < getMinDistance())
             metadataPtr->_staticFrameCount++;
-//            objPtr->setStaticFrameCount(objPtr->getStaticFrameCount() + 1); //_pimpl->_staticFrameCountVect[objectNum]++;
         else
             metadataPtr->_staticFrameCount = 0;
-//            objPtr->setStaticFrameCount(0); //_pimpl->_staticFrameCountVect[objectNum] = 0;
 
         metadataPtr->_isStatic = metadataPtr->_staticFrameCount >= getStaticFrameCount();
-//        objPtr->setIsStatic(objPtr->getStaticFrameCount() >= getStaticFrameCount());
     }
 
+    // reset service metadata
+    for (ObjectMetadata &metadata : _pimpl->_objectVect)
+    {
+        metadata._isStand = false;
+
+        // reset contiguous objects
+        metadata._objectPtr->resetContiguousObjects();
+
+        for (long num : Range(4))
+            metadata._contiguousObjects[num] = nullptr;
+    }
+
+    // apply phisical rules
     for (ObjectMetadata &metadata : _pimpl->_objectVect)
     {
         SimplePhysicalObjectPointer objPtr = metadata._objectPtr;
@@ -152,14 +157,6 @@ void PhysicalEngine::processWorld()
 
             _pimpl->applyFrictionBetween(objPtr, downObjPtr, false, frameTime);
             _pimpl->applyFrictionBetween(objPtr, rightObjPtr, true, frameTime);
-
-            // reset contiguous objects
-//            objPtr->setIsStand(false);
-            metadata._isStand = false;
-            objPtr->resetContiguousObjects();
-
-            for (long num : Range(4))
-                metadata._contiguousObjects[num] = nullptr;
 
             // limit speeds & apply air friction
             Point speedV = objPtr->getSpeed();
@@ -239,7 +236,6 @@ void PhysicalEngine::processWorld()
                 ObjectMetadata *metadataPtr = &_pimpl->_objectVect[objectNum];
                 SimplePhysicalObjectPointer objPtr = metadataPtr->_objectPtr;
 
-                // regular move objects
                 if (!metadataPtr->_isStatic)
                     objPtr->setPosition(objPtr->getPosition()
                                         + objPtr->getSpeed()
@@ -248,8 +244,6 @@ void PhysicalEngine::processWorld()
 
             frameTime *= (1 - minCollisionTime);
         }
-
-//    std::cout << count - 1 << std::endl;
 
     // Debug output
 #ifdef DEBUG_OUTPUT
@@ -559,6 +553,8 @@ void PhysicalEngine::Impl::activate(ObjectMetadata *metadataPtr,
 }
 
 
+// phisical calculations
+
 void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer obj1Ptr,
                                                 SimplePhysicalObjectPointer obj2Ptr,
                                                 bool isHorizontal, double frameTime)
@@ -597,17 +593,6 @@ void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer obj1
 }
 
 
-
-Point PhysicalEngine::Impl::getRotatedVector(const Point &vector, double angle)
-{
-    double length = sqrt(vector.getX() * vector.getX() + vector.getY() * vector.getY());
-    double pointAngle = atan2(vector.getY(), vector.getX());
-
-    return Point(cos(pointAngle + angle) * length,
-                 sin(pointAngle + angle) * length);
-}
-
-
 std::pair<double, double> PhysicalEngine::Impl::solveCentralHit(double speed1, double mass1,
                                                                 double speed2, double mass2)
 {
@@ -616,6 +601,25 @@ std::pair<double, double> PhysicalEngine::Impl::solveCentralHit(double speed1, d
     return std::make_pair(v1, v2);
 }
 
+
+// public procedures
+
+void PhysicalEngine::updateMetadata()
+{
+    if (getWorldPtr() == nullptr)
+        throw std::logic_error("PhysicalEngine::updateObjectCache: world is not set");
+
+    _pimpl->_objectVect.clear();
+    _pimpl->_objectCollectorPtr->visit(getWorldPtr()->getSubObjects());
+}
+
+
+// getters
+
+PhysicalWorldPointer PhysicalEngine::getWorldPtr() const
+{
+    return _pimpl->_worldPtr;
+}
 
 double PhysicalEngine::getG() const
 {
@@ -658,6 +662,13 @@ double PhysicalEngine::getDefaultEnergyLostFactor()
 }
 
 
+// setters
+
+void PhysicalEngine::setWorldPtr(PhysicalWorldPointer worldPtr)
+{
+    _pimpl->_worldPtr = worldPtr;
+    updateMetadata();
+}
 
 void PhysicalEngine::setG(double g)
 {
@@ -692,3 +703,18 @@ void PhysicalEngine::setStaticFrameCount(size_t count)
 
 
 }  // namespace Platformer
+
+
+
+/* GARBAGE
+
+Point PhysicalEngine::Impl::getRotatedVector(const Point &vector, double angle)
+{
+    double length = sqrt(vector.getX() * vector.getX() + vector.getY() * vector.getY());
+    double pointAngle = atan2(vector.getY(), vector.getX());
+
+    return Point(cos(pointAngle + angle) * length,
+                 sin(pointAngle + angle) * length);
+}
+
+*/

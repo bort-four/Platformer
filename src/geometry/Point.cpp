@@ -113,6 +113,8 @@ Direction getOppositeDirrection(Direction dir)
     case Left:  return Right;
     case Right: return Left;
     }
+
+    throw std::logic_error("getOppositeDirrection: invalid direction");
 }
 
 
