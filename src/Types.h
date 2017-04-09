@@ -28,6 +28,8 @@ class Key;
 class PhysicalEngine;
 class HierarchicalVisitor;
 class MapPlatform;
+class CollisionProcessor;
+class StrictCollisionProcessor;
 
 template <class ValueType> using Pointer = std::shared_ptr<ValueType>;
 template <class BaseNodeType> class VisitorBase;
@@ -51,6 +53,8 @@ using KeyPointer = Pointer<Key>;
 using PhysicalEnginePointer = Pointer<PhysicalEngine>;
 using HierarchicalVisitorPointer = Pointer<HierarchicalVisitor>;
 using MapPlatformPointer = Pointer<MapPlatform>;
+using CollisionProcessorPointer = Pointer<CollisionProcessor>;
+using StrictCollisionProcessorPointer = Pointer<StrictCollisionProcessor>;
 
 using SimpleKeyPointer = Key*;
 using SimpleGameObjectPointer = GameObject*;

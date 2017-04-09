@@ -36,13 +36,13 @@ struct ObjectMetadata
 };
 
 
-struct CollisionInfo
-{
-    size_t _lessObjectNum, _largerObectNum;
-    double _time;
-    bool _hasCollision;
-    Direction _direction;
-};
+//struct CollisionInfo
+//{
+//    size_t _lessObjectNum, _largerObectNum;
+//    double _time;
+//    bool _hasCollision;
+//    Direction _direction;
+//};
 
 
 
@@ -521,7 +521,6 @@ void PhysicalEngine::Impl::processStand(/*SimplePhysicalObjectPointer objPtr*/
 }
 
 
-//void PhysicalEngine::Impl::activate(SimplePhysicalObjectPointer objPtr, SimplePhysicalObjectPointer parentPtr)
 void PhysicalEngine::Impl::activate(ObjectMetadata *metadataPtr,
                                     ObjectMetadata *parentMetadataPtr)
 {
