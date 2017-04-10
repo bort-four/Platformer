@@ -49,9 +49,9 @@ double PhysicalObject::getFrictionFactor() const
     return PhysicalEngine::getDefaultFirictionFactor();
 }
 
-double PhysicalObject::getEnergyLostFactor() const
+double PhysicalObject::getHitRecoveryFactor() const
 {
-    return PhysicalEngine::getDefaultEnergyLostFactor();
+    return PhysicalEngine::getDefaultHitRecoveryFactor();
 }
 
 bool PhysicalObject::isMovable() const

@@ -29,7 +29,7 @@ public:
     size_t getStaticFrameCount() const;
 
     static double getDefaultFirictionFactor();
-    static double getDefaultEnergyLostFactor();
+    static double getDefaultHitRecoveryFactor();
 
     void setWorldPtr(PhysicalWorldPointer worldPtr);
     void updateMetadata();

@@ -247,7 +247,7 @@ void PhysicalEngine::processWorld()
 
     // Debug output
 #ifdef DEBUG_OUTPUT
-//    if (count > 1)
+    //if (count > 1)
         std::cout << std::endl;
 #endif
 
@@ -428,7 +428,7 @@ void PhysicalEngine::Impl::processCollision(size_t objNum1, size_t objNum2,
 
     // calculate new speeds
     const double ENERGY_LOST_FACTOR
-            = (objPtr1->getEnergyLostFactor() + objPtr2->getEnergyLostFactor()) / 2;
+            = (objPtr1->getHitRecoveryFactor() + objPtr2->getHitRecoveryFactor()) / 2;
 
     if (!objPtr1->isMovable() || !objPtr2->isMovable())
     {
@@ -655,9 +655,9 @@ double PhysicalEngine::getDefaultFirictionFactor()
     return 50; //200;
 }
 
-double PhysicalEngine::getDefaultEnergyLostFactor()
+double PhysicalEngine::getDefaultHitRecoveryFactor()
 {
-    return 0.4;
+    return 0.5;
 }
 
 

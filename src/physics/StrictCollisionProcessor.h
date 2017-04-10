@@ -21,8 +21,8 @@ public:
     virtual StrictCollisionProcessor& operator=(StrictCollisionProcessor&& other);
     virtual ~StrictCollisionProcessor();
 
-    virtual void processCollisions() override;
     virtual void updateMetadata() override;
+    virtual void processFrame(double frameTimeSec) override;
 
 private:
     struct Impl;

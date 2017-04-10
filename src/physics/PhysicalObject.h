@@ -20,26 +20,18 @@ public:
 
     virtual double getMass() const;
     virtual double getFrictionFactor() const;
-    virtual double getEnergyLostFactor() const;
+    virtual double getHitRecoveryFactor() const;
     virtual bool isMovable() const;
-//    virtual bool isStatic() const;
-//    virtual bool isStand() const;
     virtual Point getPosition() const override;
     virtual Point getSpeed() const;
     virtual RectangleIteratorPtr getGeometry() const;
     virtual SimplePhysicalObjectPointer getContiguousObject(Direction dir) const;
-//    virtual size_t getStaticFrameCount() const;
-//    virtual Point getLastPosition() const;
 
     virtual void accept(GameObjectVisitor& visitor) override;
     virtual void setPosition(Point posotion);
     virtual void setSpeed(const Point &speed);
     virtual void setContiguousObject(Direction dir, SimplePhysicalObjectPointer objectPtr);
     virtual void resetContiguousObjects();
-//    virtual void setIsStatic(bool isStatic);
-//    virtual void setIsStand(bool isStand);
-//    virtual void setStaticFrameCount(size_t count);
-//    virtual void setLastPosition(const Point &position);
 
 protected:
     PhysicalObject(const std::string &name = "[PhysicalObject]");

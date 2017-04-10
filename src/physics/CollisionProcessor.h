@@ -22,8 +22,8 @@ public:
     PhysicalEnginePointer getEnginePtr() const;
 
     void setEnginePtr(const PhysicalEnginePointer &getEnginePtr);
-    virtual void processCollisions() = 0;
     virtual void updateMetadata() = 0;
+    virtual void processFrame(double frameTimeSec) = 0;
 
 protected:
     CollisionProcessor(PhysicalEnginePointer enginePtr);
