@@ -27,9 +27,11 @@ public:
     inline double getX() const { return _x; }
     inline double getY() const { return _y; }
     double getLength() const;
+    double getProjection(bool isHorisontal) const;
 
     inline void setX(double x) { _x = x; }
     inline void setY(double y) { _y = y; }
+    void setProjection(double value, bool isHorisontal);
 
     Point operator+(const Point &pt);
     Point operator+(double val);

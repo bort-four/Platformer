@@ -25,6 +25,7 @@ struct ObjectMetadata
 
     SimplePhysicalObjectPointer _objectPtr = nullptr;
     size_t _lastConnectionNum = 0;
+    Point _lastPosition;
 };
 
 
@@ -128,7 +129,7 @@ void StrictCollisionProcessor::processFrame(double frameTimeSec)
     // update state of object metadata & other service actions
     _pimpl->doPreProcess(frameTimeSec);
 
-    // do collision checking & processing
+    // collision checking & processing
     _pimpl->processCollisions(frameTimeSec);
 
     // error recovery
@@ -136,12 +137,19 @@ void StrictCollisionProcessor::processFrame(double frameTimeSec)
 }
 
 
-
 void StrictCollisionProcessor::Impl::doPreProcess(double /*frameTimeSec*/)
 {
-    // reset contiguous objects
     for (ObjectMetadata &metadata : _objectVect)
+    {
+        // reset contiguous objects
         metadata._objectPtr->resetContiguousObjects();
+
+        // remember current position
+        metadata._lastPosition = metadata._objectPtr->getPosition();
+
+        // reset last connection number
+        metadata._lastConnectionNum = 0;
+    }
 }
 
 
@@ -171,25 +179,70 @@ void StrictCollisionProcessor::Impl::processCollisions(double fullframeTimeSec)
         if (hasCollision)
             processCollision(earliestCollision, restFrameTimeSec);
 
-        // move other objects to collision moment
-        for (size_t objectNum = 0; objectNum < _objectVect.size(); ++objectNum)
-            if (objectNum != earliestCollision._lessObjectNum
-                    && objectNum != earliestCollision._greaterObectNum)
-            {
-                ObjectMetadata *metadataPtr = &_objectVect[objectNum];
-                SimplePhysicalObjectPointer objPtr = metadataPtr->_objectPtr;
+//            if (objectNum != earliestCollision._lessObjectNum
+//                    && objectNum != earliestCollision._greaterObectNum)
 
-                //if (!metadataPtr->_isStatic)
-                objPtr->setPosition(objPtr->getPosition()
-                                    + objPtr->getSpeed() * restFrameTimeSec * earliestCollision._timeRate);
-            }
+        // move objects to collision moment
+        for (size_t objectNum = 0; objectNum < _objectVect.size(); ++objectNum)
+        {
+            ObjectMetadata *metadataPtr = &_objectVect[objectNum];
+            SimplePhysicalObjectPointer objPtr = metadataPtr->_objectPtr;
+
+            //if (!metadataPtr->_isStatic)
+            objPtr->setPosition(objPtr->getPosition()
+                                + objPtr->getSpeed() * restFrameTimeSec * earliestCollision._timeRate);
+        }
 
         restFrameTimeSec *= (1 - earliestCollision._timeRate);
     }
 }
 
 
-void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &collision, double frameTimeSec)
+void StrictCollisionProcessor::Impl::doPostProcess(double /*frameTimeSec*/)
+{
+    // error recovery
+    // for each pair of objects
+    for (size_t lessObjectNum = 0; lessObjectNum < _objectVect.size(); ++lessObjectNum)
+        for (size_t greaterObjectNum = lessObjectNum + 1; greaterObjectNum < _objectVect.size(); ++greaterObjectNum)
+        {
+            ObjectMetadata *firstMetadataPtr  = &_objectVect[lessObjectNum];
+            ObjectMetadata *secondMetadataPtr = &_objectVect[greaterObjectNum];
+            SimplePhysicalObjectPointer firstObjectPtr  = firstMetadataPtr->_objectPtr;
+            SimplePhysicalObjectPointer secondObjectPtr = secondMetadataPtr->_objectPtr;
+
+            auto firstRectIt  = firstObjectPtr->getGeometry();
+            auto secondRectIt = secondObjectPtr->getGeometry();
+            bool isCollide = false;
+
+            // for each pair of objects rectangles
+            for (firstRectIt->first(); !firstRectIt->isDone() && !isCollide; firstRectIt->next())
+                for (secondRectIt->first(); !secondRectIt->isDone() && !isCollide; secondRectIt->next())
+                {
+                    // calculate position of first rectangle at -ABSOLUTE_TIME_ERROR / 2 moment
+                    Rectangle firstRect = firstRectIt->current();
+                    firstRect.setPosition(firstRect.getPosition() + firstObjectPtr->getSpeed() * (ABSOLUTE_TIME_ERROR * -0.5));
+                    firstRect = firstObjectPtr->mapToGlobal(firstRect, _worldPtr.get());
+
+                    // calculate position of second rectangle at -ABSOLUTE_TIME_ERROR / 2 moment
+                    Rectangle secondRect = secondRectIt->current();
+                    secondRect.setPosition(secondRect.getPosition() + secondObjectPtr->getSpeed() * (ABSOLUTE_TIME_ERROR * -0.5));
+                    secondRect = secondObjectPtr->mapToGlobal(secondRect, _worldPtr.get());
+
+                    // if rectangles collide then there is an error here
+                    isCollide = firstRect.isStrongCollided(secondRect);
+                }
+
+            // in case of error return objects to the last position
+            if (isCollide)
+            {
+                firstObjectPtr->setPosition(firstMetadataPtr->_lastPosition);
+                secondObjectPtr->setPosition(secondMetadataPtr->_lastPosition);
+            }
+        }
+}
+
+
+void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &collision, double /*frameTimeSec*/)
 {
     ObjectMetadata *firstMetadataPtr  = &_objectVect[collision._lessObjectNum];
     ObjectMetadata *secondMetadataPtr = &_objectVect[collision._greaterObectNum];
@@ -197,109 +250,60 @@ void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &colli
     SimplePhysicalObjectPointer secondObjPtr = secondMetadataPtr->_objectPtr;
     const bool isHorizontalCollision = collision._direction == Right || collision._direction == Left;
 
+    // move objects to collision point
+    // firstObjPtr->setPosition(firstObjPtr->getPosition()   + firstObjPtr->getSpeed()  * frameTimeSec * collision._timeRate);
+    // secondObjPtr->setPosition(secondObjPtr->getPosition() + secondObjPtr->getSpeed() * frameTimeSec * collision._timeRate);
+
     // set contiguous objects
     firstObjPtr->setContiguousObject(collision._direction, secondObjPtr);
     secondObjPtr->setContiguousObject(getOppositeDirrection(collision._direction), firstObjPtr);
 
-    // move objects to collision point
-    firstObjPtr->setPosition(firstObjPtr->getPosition()   + firstObjPtr->getSpeed()  * frameTimeSec * collision._timeRate);
-    secondObjPtr->setPosition(secondObjPtr->getPosition() + secondObjPtr->getSpeed() * frameTimeSec * collision._timeRate);
+    // TODO: special collision processing
 
     // calculate new speeds
-    const double speedRecoveryFactor = (firstObjPtr->getHitRecoveryFactor()
+    const double speedRecoveryFactor = (   firstObjPtr->getHitRecoveryFactor()
                                         + secondObjPtr->getHitRecoveryFactor()) / 2;
 
-    if (!firstObjPtr->isMovable() && !secondObjPtr->isMovable())
+    if (firstObjPtr->isMovable() && secondObjPtr->isMovable())
     {
-        // do nothing
+        // hit between two objects
+        double firstObjectSpeed  = firstObjPtr->getSpeed().getProjection(isHorizontalCollision);
+        double secondObjectSpeed = secondObjPtr->getSpeed().getProjection(isHorizontalCollision);
+        double newFirstObjectSpeed  = 0;
+        double newSecondObjectSpeed = 0;
+
+        solveCentralHit(firstObjectSpeed, firstObjPtr->getMass(),
+                        secondObjectSpeed, secondObjPtr->getMass(),
+                        speedRecoveryFactor,
+                        newFirstObjectSpeed, newSecondObjectSpeed);
+
+        Point firstObjectSpeedVect = firstObjPtr->getSpeed();
+        firstObjectSpeedVect.setProjection(newFirstObjectSpeed, isHorizontalCollision);
+        firstObjPtr->setSpeed(firstObjectSpeedVect);
+
+        Point secondObjectSpeedVect = secondObjPtr->getSpeed();
+        secondObjectSpeedVect.setProjection(newSecondObjectSpeed, isHorizontalCollision);
+        secondObjPtr->setSpeed(secondObjectSpeedVect);
     }
-    if (!firstObjPtr->isMovable() || !secondObjPtr->isMovable())
+    else if (firstObjPtr->isMovable() || secondObjPtr->isMovable())
     {
         // hit between object and platform
         SimplePhysicalObjectPointer objectPtr   = ( firstObjPtr->isMovable() ? firstObjPtr : secondObjPtr);
         SimplePhysicalObjectPointer platformPtr = (!firstObjPtr->isMovable() ? firstObjPtr : secondObjPtr);
+        double objectSpeed   = objectPtr->getSpeed().getProjection(isHorizontalCollision);
+        double platformSpeed = platformPtr->getSpeed().getProjection(isHorizontalCollision);
+        double newObjectSpeed   = 0;
 
-        // ...
+        solvePlatformHit(objectSpeed, platformSpeed, speedRecoveryFactor, newObjectSpeed);
+
+        Point objectSpeedVect = objectPtr->getSpeed();
+        objectSpeedVect.setProjection(newObjectSpeed, isHorizontalCollision);
+        objectPtr->setSpeed(objectSpeedVect);
     }
     else
     {
-        // hit between two objects
+        // do nothing
     }
-
-    // //////////////////////////////////
-    /*
-    const double ENERGY_LOST_FACTOR
-            = (firstObjPtr->getHitRecoveryFactor() + secondObjPtr->getHitRecoveryFactor()) / 2;
-
-    if (!firstObjPtr->isMovable() || !secondObjPtr->isMovable())
-    {
-        SimplePhysicalObjectPointer objPtr = (firstObjPtr->isMovable() ? firstObjPtr : secondObjPtr);
-        Point speedV = objPtr->getSpeed();
-
-        double speed = isHorizontalCollision ? speedV.getX() : speedV.getY();
-        int sign = speed > 0 ? 1 : -1;
-        double v = std::abs(speed);
-        double e = objPtr->getMass() * v * v / 2;
-        double de = e * (1 - ENERGY_LOST_FACTOR);
-        double dv = std::sqrt(2 * de / objPtr->getMass());
-
-        if (isHorizontalCollision)
-             objPtr->setSpeed(Point(-speedV.getX() + dv * sign, speedV.getY()));
-        else objPtr->setSpeed(Point(speedV.getX(), -speedV.getY() + dv * sign));
-    }
-    else
-    {
-        std::pair<double, double> speedPair;
-
-        if (isHorizontalCollision)
-        {
-            speedPair = solveCentralHit(speed1V.getX(), firstObjPtr->getMass(),
-                                        speed2V.getX(), secondObjPtr->getMass());
-
-            int sign1 = speedPair.first  > 0 ? 1 : -1;
-            int sign2 = speedPair.second > 0 ? 1 : -1;
-            double v = std::abs(speedPair.first - speedPair.second);
-            double e = (firstObjPtr->getMass() + secondObjPtr->getMass()) * v * v / 4;
-            double de = e * (1 - ENERGY_LOST_FACTOR);
-            double de1 = de * std::abs(speedPair.first)  / (std::abs(speedPair.first) + std::abs(speedPair.second));
-            double de2 = de * std::abs(speedPair.second) / (std::abs(speedPair.first) + std::abs(speedPair.second));
-            double dv1 = std::sqrt(2 * de1 / firstObjPtr->getMass());
-            double dv2 = std::sqrt(2 * de2 / firstObjPtr->getMass());
-
-            speed1V.setX(speedPair.first  - dv1 * sign1);
-            speed2V.setX(speedPair.second - dv2 * sign2);
-        }
-        else
-        {
-            speedPair = solveCentralHit(speed1V.getY(), firstObjPtr->getMass(),
-                                        speed2V.getY(), secondObjPtr->getMass());
-
-            int sign1 = speedPair.first  > 0 ? 1 : -1;
-            int sign2 = speedPair.second > 0 ? 1 : -1;
-            double v = std::abs(speedPair.first - speedPair.second);
-            double e = (firstObjPtr->getMass() + secondObjPtr->getMass()) * v * v / 4;
-            double de = e * (1 - ENERGY_LOST_FACTOR);
-            double de1 = de * std::abs(speedPair.first)  / (std::abs(speedPair.first) + std::abs(speedPair.second));
-            double de2 = de * std::abs(speedPair.second) / (std::abs(speedPair.first) + std::abs(speedPair.second));
-            double dv1 = std::sqrt(2 * de1 / firstObjPtr->getMass());
-            double dv2 = std::sqrt(2 * de2 / firstObjPtr->getMass());
-
-            speed1V.setY(speedPair.first  - dv1 * sign1);
-            speed2V.setY(speedPair.second - dv2 * sign2);
-        }
-
-        firstObjPtr->setSpeed(speed1V);
-        secondObjPtr->setSpeed(speed2V);
-    }
-
-    firstObjPtr->setContiguousObject(direction, secondObjPtr);
-    secondObjPtr->setContiguousObject(getOppositeDirrection(direction), firstObjPtr);
-    firstMetadataPtr->_contiguousObjects[direction] = secondMetadataPtr;
-    secondMetadataPtr->_contiguousObjects[getOppositeDirrection(direction)] = firstMetadataPtr;
-
-    processStand(firstMetadataPtr);
-    processStand(secondMetadataPtr);
-    */
 }
 
 
@@ -434,12 +438,6 @@ void StrictCollisionProcessor::Impl::solveCentralHit(double firstObjectSpeed,   
             / (firstObjectMass + secondObjectMass);
 
     newSecondObjectSpeed = newFirstObjectSpeed + speedRecoveryFactor * speedDifference;
-}
-
-
-void StrictCollisionProcessor::Impl::doPostProcess(double /*frameTimeSec*/)
-{
-    // ...
 }
 
 

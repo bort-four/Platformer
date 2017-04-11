@@ -52,6 +52,21 @@ double Point::getLength() const
     return std::sqrt(_x * _x + _y * _y);
 }
 
+double Point::getProjection(bool isHorisontal) const
+{
+    if (isHorisontal)
+         return getX();
+    else return getY();
+}
+
+
+void Point::setProjection(double value, bool isHorisontal)
+{
+    if (isHorisontal)
+         setX(value);
+    else setY(value);
+}
+
 Point::~Point() = default;
 
 

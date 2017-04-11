@@ -1,5 +1,7 @@
 // PhysicalEngine.h
 
+#if 0
+
 #ifndef PHYSICALENGINE_H
 #define PHYSICALENGINE_H
 
@@ -21,19 +23,25 @@ public:
     virtual ~PhysicalEngine();
 
     PhysicalWorldPointer getWorldPtr() const;
-    double getGravityAcceleration() const;
-    double getAirFrictionDeceleration() const;
+    double getG() const;
+    double getAirFrictionFactor() const;
+    double getMinSpeed() const;
     double getMaxSpeed() const;
+    double getMinDistance() const;
+    size_t getStaticFrameCount() const;
 
     static double getDefaultFirictionFactor();
     static double getDefaultHitRecoveryFactor();
 
+    void setWorldPtr(PhysicalWorldPointer worldPtr);
     void updateMetadata();
     void processWorld();
-    void setWorldPtr(PhysicalWorldPointer worldPtr);
-    void setGravityAcceleration(double gravityAcceleration);
-    void setAirFrictionDeceleration(double factor);
+    void setG(double G);
+    void setAirFrictionFactor(double factor);
+    void setMinSpeed(double speed);
     void setMaxSpeed(double speed);
+    void setMinDistance(double distance);
+    void setStaticFrameCount(size_t count);
 
 private:
     struct Impl;
@@ -44,3 +52,6 @@ private:
 }  // namespace Platformer
 
 #endif  // PHYSICALENGINE_H
+
+
+#endif
