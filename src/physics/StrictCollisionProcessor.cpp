@@ -86,6 +86,7 @@ struct StrictCollisionProcessor::Impl
     PhysicalWorldPointer _worldPtr;
     SimpleHierarchicalVisitorPointer<PhysicalObject> _objectCollectorPtr;
     std::vector<ObjectMetadata> _objectVect;
+    size_t _totalConnectionCount;
 
     // constants
     const double ABSOLUTE_TIME_ERROR  = 0.0001;
@@ -96,7 +97,7 @@ struct StrictCollisionProcessor::Impl
 
 
 
-StrictCollisionProcessor::StrictCollisionProcessor(PhysicalEnginePointer enginePtr)
+StrictCollisionProcessor::StrictCollisionProcessor(SimplePhysicalEnginePointer enginePtr)
     : CollisionProcessor(enginePtr)
     , _pimpl(new Impl())
 {
@@ -126,6 +127,8 @@ void StrictCollisionProcessor::updateMetadata()
 
 void StrictCollisionProcessor::processFrame(double frameTimeSec)
 {
+    //std::cout << "StrictCollisionProcessor::processFrame" << std::endl;
+
     // update state of object metadata & other service actions
     _pimpl->doPreProcess(frameTimeSec);
 
@@ -133,7 +136,7 @@ void StrictCollisionProcessor::processFrame(double frameTimeSec)
     _pimpl->processCollisions(frameTimeSec);
 
     // error recovery
-    _pimpl->doPostProcess(frameTimeSec);
+    // _pimpl->doPostProcess(frameTimeSec);
 }
 
 
@@ -155,7 +158,7 @@ void StrictCollisionProcessor::Impl::doPreProcess(double /*frameTimeSec*/)
 
 void StrictCollisionProcessor::Impl::processCollisions(double fullframeTimeSec)
 {
-    // collision check
+    _totalConnectionCount = 0;
     size_t iterationCount = 0;
     double restFrameTimeSec = fullframeTimeSec;
 
@@ -179,19 +182,18 @@ void StrictCollisionProcessor::Impl::processCollisions(double fullframeTimeSec)
         if (hasCollision)
             processCollision(earliestCollision, restFrameTimeSec);
 
-//            if (objectNum != earliestCollision._lessObjectNum
-//                    && objectNum != earliestCollision._greaterObectNum)
-
         // move objects to collision moment
         for (size_t objectNum = 0; objectNum < _objectVect.size(); ++objectNum)
-        {
-            ObjectMetadata *metadataPtr = &_objectVect[objectNum];
-            SimplePhysicalObjectPointer objPtr = metadataPtr->_objectPtr;
+            if (objectNum != earliestCollision._lessObjectNum
+                    && objectNum != earliestCollision._greaterObectNum)
+            {
+                ObjectMetadata *metadataPtr = &_objectVect[objectNum];
+                SimplePhysicalObjectPointer objPtr = metadataPtr->_objectPtr;
 
-            //if (!metadataPtr->_isStatic)
-            objPtr->setPosition(objPtr->getPosition()
-                                + objPtr->getSpeed() * restFrameTimeSec * earliestCollision._timeRate);
-        }
+                //if (!metadataPtr->_isStatic)
+                objPtr->setPosition(objPtr->getPosition()
+                                    + objPtr->getSpeed() * restFrameTimeSec * earliestCollision._timeRate);
+            }
 
         restFrameTimeSec *= (1 - earliestCollision._timeRate);
     }
@@ -242,7 +244,7 @@ void StrictCollisionProcessor::Impl::doPostProcess(double /*frameTimeSec*/)
 }
 
 
-void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &collision, double /*frameTimeSec*/)
+void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &collision, double frameTimeSec)
 {
     ObjectMetadata *firstMetadataPtr  = &_objectVect[collision._lessObjectNum];
     ObjectMetadata *secondMetadataPtr = &_objectVect[collision._greaterObectNum];
@@ -251,14 +253,51 @@ void StrictCollisionProcessor::Impl::processCollision(const CollisionInfo &colli
     const bool isHorizontalCollision = collision._direction == Right || collision._direction == Left;
 
     // move objects to collision point
-    // firstObjPtr->setPosition(firstObjPtr->getPosition()   + firstObjPtr->getSpeed()  * frameTimeSec * collision._timeRate);
-    // secondObjPtr->setPosition(secondObjPtr->getPosition() + secondObjPtr->getSpeed() * frameTimeSec * collision._timeRate);
+     firstObjPtr->setPosition(firstObjPtr->getPosition()   + firstObjPtr->getSpeed()  * frameTimeSec * collision._timeRate);
+     secondObjPtr->setPosition(secondObjPtr->getPosition() + secondObjPtr->getSpeed() * frameTimeSec * collision._timeRate);
 
     // set contiguous objects
+    SimplePhysicalObjectPointer lastNeighborPtr = firstObjPtr->getContiguousObject(collision._direction);
     firstObjPtr->setContiguousObject(collision._direction, secondObjPtr);
     secondObjPtr->setContiguousObject(getOppositeDirrection(collision._direction), firstObjPtr);
 
-    // TODO: special collision processing
+    // set connection number
+    if (lastNeighborPtr != secondObjPtr)
+    {
+        _totalConnectionCount++;
+        firstMetadataPtr->_lastConnectionNum = _totalConnectionCount;
+    }
+
+    bool hasSameConnectionNum = firstMetadataPtr->_lastConnectionNum
+                            == secondMetadataPtr->_lastConnectionNum;
+    size_t maxConnectionNum = std::max(firstMetadataPtr->_lastConnectionNum,
+                                       secondMetadataPtr->_lastConnectionNum);
+    firstMetadataPtr->_lastConnectionNum  = maxConnectionNum;
+    secondMetadataPtr->_lastConnectionNum = maxConnectionNum;
+
+    if (hasSameConnectionNum)
+    {
+        // simplified collision processing
+        double firstObjectSpeed  = firstObjPtr->getSpeed().getProjection(isHorizontalCollision);
+        double secondObjectSpeed = secondObjPtr->getSpeed().getProjection(isHorizontalCollision);
+        double newSpeed = 0;
+
+        if (!firstObjPtr->isMovable())
+            newSpeed = firstObjectSpeed;
+        else if (!secondObjPtr->isMovable())
+            newSpeed = secondObjectSpeed;
+        else
+            newSpeed = 0;
+
+        Point firstObjectSpeedVect = firstObjPtr->getSpeed();
+        firstObjectSpeedVect.setProjection(newSpeed, isHorizontalCollision);
+        firstObjPtr->setSpeed(firstObjectSpeedVect);
+
+        Point secondObjectSpeedVect = secondObjPtr->getSpeed();
+        secondObjectSpeedVect.setProjection(newSpeed, isHorizontalCollision);
+        secondObjPtr->setSpeed(secondObjectSpeedVect);
+        return;
+    }
 
     // calculate new speeds
     const double speedRecoveryFactor = (   firstObjPtr->getHitRecoveryFactor()

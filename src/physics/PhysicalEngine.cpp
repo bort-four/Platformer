@@ -14,6 +14,7 @@
 #include "PhysicalWorld.h"
 #include "PhysicalObject.h"
 #include "PhysicalEngine.h"
+#include "StrictCollisionProcessor.h"
 
 
 namespace Platformer
@@ -36,6 +37,7 @@ struct PhysicalEngine::Impl
     PhysicalWorldPointer _worldPtr;
     std::vector<SimplePhysicalObjectPointer> _objectVect;
     SimpleHierarchicalVisitorPointer<PhysicalObject> _objectCollectorPtr;
+    CollisionProcessorPointer _collisionProcessor;
 
     double _gravityAcceleration = 2000.0;
     double _airFrictionDeceleration = 50;
@@ -51,6 +53,8 @@ PhysicalEngine::PhysicalEngine()
     {
         _pimpl->_objectVect.emplace_back(&object);
     }));
+
+    _pimpl->_collisionProcessor = std::make_shared<StrictCollisionProcessor>(this);
 }
 
 
@@ -68,6 +72,7 @@ void PhysicalEngine::updateMetadata()
     _pimpl->_objectCollectorPtr->visit(getWorldPtr()->getSubObjects());
 
     // TODO: CollisionProcessor::updateMetadata
+    _pimpl->_collisionProcessor->updateMetadata();
 }
 
 
@@ -80,7 +85,7 @@ void PhysicalEngine::processWorld()
     _pimpl->applyPhisicalRules(frameTimeSec);
 
     // move objects & process collisions
-    // ...
+    _pimpl->_collisionProcessor->processFrame(frameTimeSec);
 }
 
 
@@ -88,18 +93,23 @@ void PhysicalEngine::Impl::applyPhisicalRules(double frameTimeSec)
 {
     for (SimplePhysicalObjectPointer objectPtr : _objectVect)
     {
-        // apply gravity
-        objectPtr->setSpeed(objectPtr->getSpeed() + Point(0, _gravityAcceleration * frameTimeSec));
+        if (objectPtr->isMovable())
+        {
+            // apply gravity
+            objectPtr->setSpeed(objectPtr->getSpeed() + Point(0, _gravityAcceleration * frameTimeSec));
 
-        // apply air friction
-        double speedLost = _airFrictionDeceleration * frameTimeSec;
-        Point speedVect = objectPtr->getSpeed();
-        double speedX = speedVect.getX();
-        double speedY = speedVect.getY();
-        speedX = std::abs(speedX) < speedLost ? 0 : (std::abs(speedX) - speedLost) * sign(speedX);
-        speedY = std::abs(speedY) < speedLost ? 0 : (std::abs(speedY) - speedLost) * sign(speedY);
+            // apply air friction
+            double frictionValue = _airFrictionDeceleration * frameTimeSec;
+            double frictionAngle = std::atan2(-objectPtr->getSpeed().getY(),
+                                              -objectPtr->getSpeed().getX());
+            Point frictionVect(frictionValue * std::cos(frictionAngle),
+                               frictionValue * std::sin(frictionAngle));
 
-        objectPtr->setSpeed(Point(speedX, speedY));
+            if (objectPtr->getSpeed().getLength() < frictionVect.getLength())
+                objectPtr->setSpeed(0);
+            else
+                objectPtr->setSpeed(objectPtr->getSpeed() + frictionVect);
+        }
 
         // apply friction with another objects
         SimplePhysicalObjectPointer downObjectPtr  = objectPtr->getContiguousObject(Down);
@@ -111,9 +121,10 @@ void PhysicalEngine::Impl::applyPhisicalRules(double frameTimeSec)
 }
 
 
-void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer firstObjectPtr,
-                                                SimplePhysicalObjectPointer secondObjectPtr,
-                                                Direction connectionDir, double frameTimeSec)
+void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer /*firstObjectPtr*/,
+                                                SimplePhysicalObjectPointer /*secondObjectPtr*/,
+                                                Direction /*connectionDir*/,
+                                                double /*frameTimeSec*/)
 {
     // ...
 }
@@ -173,7 +184,7 @@ double PhysicalEngine::getGravityAcceleration() const
 
 double PhysicalEngine::getAirFrictionDeceleration() const
 {
-    return _pimpl->_airFrictionFactor;
+    return _pimpl->_airFrictionDeceleration;
 }
 
 double PhysicalEngine::getMaxSpeed() const
@@ -188,7 +199,7 @@ double PhysicalEngine::getDefaultFirictionFactor()
 
 double PhysicalEngine::getDefaultHitRecoveryFactor()
 {
-    return 0.5;
+    return 0.3;
 }
 
 
@@ -205,7 +216,7 @@ void PhysicalEngine::setGravityAcceleration(double gravityAcceleration)
 
 void PhysicalEngine::setAirFrictionDeceleration(double factor)
 {
-    _pimpl->_airFrictionFactor = factor;
+    _pimpl->_airFrictionDeceleration = factor;
 }
 
 void PhysicalEngine::setMaxSpeed(double speed)

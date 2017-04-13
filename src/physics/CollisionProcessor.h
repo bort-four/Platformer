@@ -19,14 +19,14 @@ public:
     virtual CollisionProcessor& operator=(CollisionProcessor&& other);
     virtual ~CollisionProcessor();
 
-    PhysicalEnginePointer getEnginePtr() const;
+    SimplePhysicalEnginePointer getEnginePtr() const;
 
-    void setEnginePtr(const PhysicalEnginePointer &getEnginePtr);
+    void setEnginePtr(SimplePhysicalEnginePointer enginePtr);
     virtual void updateMetadata() = 0;
     virtual void processFrame(double frameTimeSec) = 0;
 
 protected:
-    CollisionProcessor(PhysicalEnginePointer enginePtr);
+    CollisionProcessor(SimplePhysicalEnginePointer enginePtr);
 
 private:
     struct Impl;

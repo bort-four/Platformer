@@ -16,7 +16,7 @@ namespace Platformer
 class StrictCollisionProcessor : public CollisionProcessor
 {
 public:
-    StrictCollisionProcessor(PhysicalEnginePointer enginePtr = nullptr);
+    StrictCollisionProcessor(SimplePhysicalEnginePointer enginePtr = nullptr);
     StrictCollisionProcessor(StrictCollisionProcessor&& other);
     virtual StrictCollisionProcessor& operator=(StrictCollisionProcessor&& other);
     virtual ~StrictCollisionProcessor();

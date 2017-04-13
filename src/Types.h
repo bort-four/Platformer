@@ -51,6 +51,7 @@ using VisualizerPointer = Pointer<Visualizer>;
 using GamePainterPointer = Pointer<GamePainter>;
 using KeyPointer = Pointer<Key>;
 using PhysicalEnginePointer = Pointer<PhysicalEngine>;
+using SimplePhysicalEnginePointer = PhysicalEngine*;
 using HierarchicalVisitorPointer = Pointer<HierarchicalVisitor>;
 using MapPlatformPointer = Pointer<MapPlatform>;
 using CollisionProcessorPointer = Pointer<CollisionProcessor>;

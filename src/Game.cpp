@@ -120,7 +120,7 @@ void Game::Impl::createDemoscene()
     addPlatform(Rectangle(7  * h, 5  * h, 4 * h, 1 * h));
 
     addPlatform(Rectangle(1  * h, 10 * h, 6 * h, 1 * h));
-    addPlatform(Rectangle(13 * h, 8  * h, 3 * h, 1 * h));
+    addPlatform(Rectangle(13 * h, 8  * h + 1, 3 * h, 1 * h));
 
     addObject(Rectangle(4  * h, 9  * h + eps,     2   * h, 1 * h));
     addObject(Rectangle(7  * h, 1  * h + eps * 3, 3   * h, 1 * h));

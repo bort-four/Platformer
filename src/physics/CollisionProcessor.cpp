@@ -13,12 +13,12 @@ struct CollisionProcessor::Impl
     {
     }
 
-    PhysicalEnginePointer _enginePtr;
+    SimplePhysicalEnginePointer _enginePtr;
 };
 
 
 
-CollisionProcessor::CollisionProcessor(PhysicalEnginePointer enginePtr)
+CollisionProcessor::CollisionProcessor(SimplePhysicalEnginePointer enginePtr)
     : _pimpl(new Impl())
 {
     _pimpl->_enginePtr = enginePtr;
@@ -30,7 +30,7 @@ CollisionProcessor& CollisionProcessor::operator=(CollisionProcessor&& /*other*/
 CollisionProcessor::~CollisionProcessor() = default;
 
 
-PhysicalEnginePointer CollisionProcessor::getEnginePtr() const
+SimplePhysicalEnginePointer CollisionProcessor::getEnginePtr() const
 {
     if (_pimpl->_enginePtr == nullptr)
         throw std::logic_error("CollisionProcessor::getEnginePtr: engine is not set");
@@ -39,7 +39,7 @@ PhysicalEnginePointer CollisionProcessor::getEnginePtr() const
 }
 
 
-void CollisionProcessor::setEnginePtr(const PhysicalEnginePointer &enginePtr)
+void CollisionProcessor::setEnginePtr(SimplePhysicalEnginePointer enginePtr)
 {
     _pimpl->_enginePtr = enginePtr;
 }
