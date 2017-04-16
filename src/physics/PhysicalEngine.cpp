@@ -78,7 +78,7 @@ void PhysicalEngine::updateMetadata()
 
 void PhysicalEngine::processWorld()
 {
-    // gate frame time
+    // get frame time
     double frameTimeSec = Platform::instance()->getActualFrameTime();
 
     // calculate objects speeds by physical rules
@@ -136,32 +136,31 @@ void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer firs
 
     double firstObjectSpeed = firstObjectPtr->getSpeed().getProjection(isHorizontalFriction);
     double secondObjectSpeed = secondObjectPtr->getSpeed().getProjection(isHorizontalFriction);
-    double averageSpeed = (firstObjectSpeed + secondObjectSpeed) / 2;
 
     if (firstObjectPtr->isMovable())
     {
-        double firstRelativeSpeed  = firstObjectSpeed  - averageSpeed;
+        double firstRelativeSpeed  = firstObjectSpeed - secondObjectSpeed;
         Point firstSpeedVect  = firstObjectPtr->getSpeed();
 
         if (std::abs(firstRelativeSpeed) > frictionValue)
             firstSpeedVect.setProjection(firstObjectSpeed
                                          - frictionValue * sign(firstRelativeSpeed), isHorizontalFriction);
         else
-            firstSpeedVect.setProjection(averageSpeed, isHorizontalFriction);
+            firstSpeedVect.setProjection(secondObjectSpeed, isHorizontalFriction);
 
         firstObjectPtr->setSpeed(firstSpeedVect);
     }
 
     if (secondObjectPtr->isMovable())
     {
-        double secondRelativeSpeed = secondObjectSpeed - averageSpeed;
+        double secondRelativeSpeed = secondObjectSpeed - firstObjectSpeed;
         Point secondSpeedVect = secondObjectPtr->getSpeed();
 
         if (std::abs(secondRelativeSpeed) > frictionValue)
             secondSpeedVect.setProjection(secondObjectSpeed
                                           - frictionValue * sign(secondRelativeSpeed), isHorizontalFriction);
         else
-            secondSpeedVect.setProjection(averageSpeed, isHorizontalFriction);
+            secondSpeedVect.setProjection(firstObjectSpeed, isHorizontalFriction);
 
         secondObjectPtr->setSpeed(secondSpeedVect);
     }
