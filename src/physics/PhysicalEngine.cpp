@@ -121,12 +121,50 @@ void PhysicalEngine::Impl::applyPhisicalRules(double frameTimeSec)
 }
 
 
-void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer /*firstObjectPtr*/,
-                                                SimplePhysicalObjectPointer /*secondObjectPtr*/,
-                                                Direction /*connectionDir*/,
-                                                double /*frameTimeSec*/)
+void PhysicalEngine::Impl::applyFrictionBetween(SimplePhysicalObjectPointer firstObjectPtr,
+                                                SimplePhysicalObjectPointer secondObjectPtr,
+                                                Direction connectionDir,
+                                                double frameTimeSec)
 {
-    // ...
+    if (firstObjectPtr == nullptr || secondObjectPtr == nullptr)
+        return;
+
+    const double frictionFactor = (firstObjectPtr->getFrictionFactor()
+                             + secondObjectPtr->getFrictionFactor()) / 2;
+    const double frictionValue = frictionFactor * frameTimeSec;
+    const bool isHorizontalFriction = !(connectionDir == Right || connectionDir == Left);
+
+    double firstObjectSpeed = firstObjectPtr->getSpeed().getProjection(isHorizontalFriction);
+    double secondObjectSpeed = secondObjectPtr->getSpeed().getProjection(isHorizontalFriction);
+    double averageSpeed = (firstObjectSpeed + secondObjectSpeed) / 2;
+
+    if (firstObjectPtr->isMovable())
+    {
+        double firstRelativeSpeed  = firstObjectSpeed  - averageSpeed;
+        Point firstSpeedVect  = firstObjectPtr->getSpeed();
+
+        if (std::abs(firstRelativeSpeed) > frictionValue)
+            firstSpeedVect.setProjection(firstObjectSpeed
+                                         - frictionValue * sign(firstRelativeSpeed), isHorizontalFriction);
+        else
+            firstSpeedVect.setProjection(averageSpeed, isHorizontalFriction);
+
+        firstObjectPtr->setSpeed(firstSpeedVect);
+    }
+
+    if (secondObjectPtr->isMovable())
+    {
+        double secondRelativeSpeed = secondObjectSpeed - averageSpeed;
+        Point secondSpeedVect = secondObjectPtr->getSpeed();
+
+        if (std::abs(secondRelativeSpeed) > frictionValue)
+            secondSpeedVect.setProjection(secondObjectSpeed
+                                          - frictionValue * sign(secondRelativeSpeed), isHorizontalFriction);
+        else
+            secondSpeedVect.setProjection(averageSpeed, isHorizontalFriction);
+
+        secondObjectPtr->setSpeed(secondSpeedVect);
+    }
 }
 
 
@@ -194,7 +232,7 @@ double PhysicalEngine::getMaxSpeed() const
 
 double PhysicalEngine::getDefaultFirictionFactor()
 {
-    return 50; //200;
+    return 100;
 }
 
 double PhysicalEngine::getDefaultHitRecoveryFactor()
